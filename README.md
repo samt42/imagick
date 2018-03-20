@@ -1,15 +1,15 @@
 # Go Imagick
 
-[![GoDoc](https://godoc.org/gopkg.in/gographics/imagick.v2/imagick?status.svg)](https://gopkg.in/gographics/imagick.v2/imagick)
+[![GoDoc](https://godoc.org/gopkg.in/gographics/imagick.v2/imagick?status.svg)](https://gopkg.in/gographics/imagick.v2/imagick) [![Travis Build Status](https://api.travis-ci.org/gographics/imagick.svg)](https://travis-ci.org/gographics/imagick)
 
 Go Imagick is a Go bind to ImageMagick's MagickWand C API.
 
 We support two compatibility branches:
 
 ```
-master (tag v2.x.x): 6.8.9-9 <= ImageMagick <= 6.9.6-2
+master (tag v2.x.x): 6.9.0-2 <= ImageMagick <= 6.9.9-35
 im-7   (tag v3.x.x): 7.x     <= ImageMagick <= 7.x
-legacy (tag v1.x.x): 6.7.x   <= ImageMagick <= 6.8.9-8
+legacy (tag v1.x.x): 6.7.x   <= ImageMagick <= 6.8.9-10
 ```
 
 They map, respectively, through gopkg.in:
@@ -41,7 +41,7 @@ sudo apt-get install libmagickwand-dev
 *Thanks @vprus*
 
 + Install [msys2-x86_64](http://www.msys2.org/)
-+ In msys shell, do: 
++ In msys shell, do:
 ```
 pacman -Syuu
 pacman -S mingw-w64-x86_64-gcc
@@ -54,10 +54,16 @@ pacman -S mingw-w64-x86_64-imagemagick
 ```
 set PATH=<msys64>\mingw64\bin;%PATH%
 set PKG_CONFIG_PATH=<msys64>\mingw64\lib\pkgconfig
-set MAGICK_CODER_MODULE_PATH=<msys64>\mingw64\lib\ImageMagick-7.0.5\modules-Q16HDRI\coders
+set MAGICK_CODER_MODULE_PATH=<msys64>\mingw64\lib\ImageMagick-7.0.6\modules-Q16HDRI\coders
 go build gopkg.in/gographics/imagick.v3/imagick
 ```
-(BTW: you should change `<msys64>` to your installation path of `msys2` ; the environment variable of `MAGICK_CODER_MODULE_PATH` is to avoid `NoDecodeDelegateForThisImageFormat` error.)
+
+The default installation path of `msys2` is `C:\msys64` and you must change
+`<msys64>` to your installation path of `msys2`.
+
+The `MAGICK_CODER_MODULE_PATH` environment variable tells ImageMagick where to
+find the decoders. If you still get the `NoDecodeDelegateForThisImageFormat`
+error, then make sure the version number and folders are correct.
 
 ## Common
 
@@ -87,9 +93,6 @@ The examples folder is full with usage examples ported from C ones found in here
 
 # Quick and partial example
 
-Since this is a CGO binding, and the Go GC does not manage memory allocated by the C API, it is then necessary to use the Terminate() and Destroy() methods.
-Objects of type MagickWand, DrawingWand, PixelIterator and PixelWand are managed by Go GC if you create them via constructors.
-
 ```go
 package main
 
@@ -104,6 +107,17 @@ func main() {
     ...
 }
 ```
+## `Initialize()` and `Terminate`
+
+As per the ImageMagick C API, `Initialize()` should be called only once to set up the resources for using ImageMagick. This is typically done in your `main()` or `init()` for the entire application or library. Applications can defer a call to `Terminate()` to tear down the ImageMagick resources.
+
+It is an error to `Initialize` and `Terminate` multiple times in specific functions and leads to common problems such as crashes or missing delegates. Do not use `Terminate` anywhere other than the absolute end of your need for ImageMagick within the program.
+
+## Managing memory
+
+Since this is a CGO binding, and the Go GC does not manage memory allocated by the C API, it is then necessary to use the Terminate() and Destroy() methods.
+
+Types which are created via `New*` constructors (MagickWand, DrawingWand, PixelIterator, PixelWand,...) are managed by Go GC through the use of finalizers.
 
 If you use struct literals, you should free resources manually:
 
@@ -159,6 +173,8 @@ func main() {
     ...
 }
 ```
+
+Calling `Destroy()` on types that are either created via `New*` or returned from other functions calls only forces the cleanup of the item immediately as opposed to later after garbage collection triggers the finalizer for the object.
 
 # License
 
